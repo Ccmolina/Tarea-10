@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+/* === Tema rosa con Tailwind v4 (sin tailwind.config.js) === */
+@theme {
+  /* Colores opcionales de marca (además de la paleta 'rose' que ya trae Tailwind) */
+  --color-ink: #0f172a;     /* slate-900 */
+  --color-sub: #475569;     /* slate-600 */
+  --color-bg:  #fff1f2;     /* rose-50 */
+  --color-ring:#fda4af;     /* rose-300 */
+}
+
+/* Fondo y tipografía base */
+html, body {
+  min-height: 100%;
+  background: var(--color-bg);
+  color: var(--color-ink);
+}
+
+/* Capas personalizadas usando @apply (v4 lo permite) */
+@layer components {
+  .container-pg { @apply max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8; }
+
+  .card       { @apply bg-white/90 backdrop-blur border border-rose-100 rounded-2xl shadow-sm; }
+  .card-pad   { @apply p-5 sm:p-6; }
+
+  .h1 { @apply text-3xl sm:text-4xl font-extrabold tracking-tight text-rose-700; }
+  .h2 { @apply text-xl sm:text-2xl font-bold text-rose-700; }
+  .muted { @apply text-sm text-slate-600; }
+
+  .input   { @apply w-full rounded-xl border border-rose-200 bg-white px-4 py-2 outline-none focus:ring-4 focus:ring-rose-300; }
+  .btn     { @apply inline-flex items-center gap-2 rounded-xl px-4 py-2 font-medium shadow-sm transition; }
+  .btn-rose{ @apply bg-rose-600 text-white hover:bg-rose-700 focus:ring-4 focus:ring-rose-300; }
+  .btn-ghost{ @apply bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200; }
+
+  .badge { @apply inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium bg-rose-50 text-rose-700 border border-rose-200; }
+}
