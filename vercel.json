@@ -1,0 +1,4 @@
+{
+  "installCommand": "npm ci",
+  "buildCommand": "prisma generate && prisma migrate deploy && next build"
+}
