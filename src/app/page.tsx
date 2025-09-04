@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image' 
 
 type Libro = {
   id: string
@@ -52,10 +53,13 @@ export default function Page() {
         {items.map(b => (
           <li key={b.id} className="card overflow-hidden">
             <Link href={`/book/${b.id}`} className="flex gap-4 card-pad hover:bg-rose-50/40 transition">
-              <img
+              <Image
                 src={b.portada || 'https://via.placeholder.com/96x144?text=No+Img'}
                 alt={b.titulo || 'Libro'}
+                width={96}
+                height={144}
                 className="w-24 h-36 object-cover rounded-xl border border-rose-100"
+              
               />
               <div className="min-w-0">
                 <h3 className="font-semibold text-lg text-rose-800 truncate">{b.titulo}</h3>
