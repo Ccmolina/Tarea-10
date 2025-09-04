@@ -27,11 +27,19 @@ type Review = {
 
 type ReviewsResponse = { items: Review[] };
 
+const toHttps = (u?: string | null) =>
+  u ? u.replace(/^http:\/\//, "https://") : null;
+
 async function getReviews(bookId: string): Promise<ReviewsResponse> {
-  const base = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
-  const res = await fetch(`${base}/api/reviews?bookId=${encodeURIComponent(bookId)}`, {
-    cache: "no-store",
-  });
+  
+  const vercelBase = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "";
+  
+  const base = process.env.NEXT_PUBLIC_BASE_URL || vercelBase || "";
+
+  const res = await fetch(
+    `${base}/api/reviews?bookId=${encodeURIComponent(bookId)}`,
+    { cache: "no-store" }
+  );
   if (!res.ok) return { items: [] };
   const data = (await res.json()) as ReviewsResponse;
   return { items: data.items ?? [] };
@@ -40,9 +48,9 @@ async function getReviews(bookId: string): Promise<ReviewsResponse> {
 export default async function BookPage({
   params,
 }: {
-  params: Promise<{ id: string }>; // 👈 Next 15 te lo está pidiendo como Promise
+  params: Promise<{ id: string }>;
 }) {
-  const { id } = await params;     // 👈 await params
+  const { id } = await params;
   const libro: Libro = await libroPorId(id);
   const { items: reviews } = await getReviews(id);
 
@@ -54,9 +62,9 @@ export default async function BookPage({
 
       <div className="card card-pad relative z-10">
         <div className="flex flex-col sm:flex-row gap-6">
-          {libro.portada ? (
+          {toHttps(libro.portada) ? (
             <Image
-              src={libro.portada}
+              src={toHttps(libro.portada)!}
               alt={libro.titulo || "Libro"}
               width={160}
               height={240}
@@ -98,8 +106,10 @@ export default async function BookPage({
       <section className="card card-pad relative z-10">
         <h2 className="h2 mb-4">Reseñas de la comunidad</h2>
         <ReviewForm bookId={libro.id} />
+
         <ul className="mt-6 grid gap-4">
           {reviews.length === 0 && <li className="muted">Sé el primero en reseñar.</li>}
+
           {reviews.map((r) => (
             <li key={r.id} className="rounded-2xl border border-rose-100 p-4 bg-rose-50/40">
               <div className="flex justify-between items-center">
