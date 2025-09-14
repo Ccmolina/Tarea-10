@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-export const runtime = "nodejs";       
-export const dynamic = "force-dynamic"; 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 
 export async function GET(req: Request) {
@@ -24,17 +24,18 @@ export async function GET(req: Request) {
   }
 }
 
-
 export async function POST(req: Request) {
   try {
     const { bookId, rating, content } = await req.json();
 
-    if (!bookId || !content?.trim())
+    if (!bookId || !content?.trim()) {
       return NextResponse.json({ error: "Faltan campos" }, { status: 400 });
+    }
 
     const ratingNum = Number(rating);
-    if (!Number.isFinite(ratingNum) || ratingNum < 1 || ratingNum > 5)
+    if (!Number.isFinite(ratingNum) || ratingNum < 1 || ratingNum > 5) {
       return NextResponse.json({ error: "rating 1-5" }, { status: 400 });
+    }
 
     const review = await prisma.review.create({
       data: { bookId, content: content.trim(), rating: Math.trunc(ratingNum) },

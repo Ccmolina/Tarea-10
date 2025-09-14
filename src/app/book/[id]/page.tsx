@@ -1,8 +1,11 @@
+
 import Image from "next/image";
 import Link from "next/link";
 import { libroPorId } from "@/lib/google";
 import { ReviewForm } from "./review-form";
 import { VoteBar } from "./VoteBar";
+
+export const dynamic = "force-dynamic"; // evita cache en prod
 
 type Libro = {
   id: string;
@@ -31,14 +34,9 @@ const toHttps = (u?: string | null) =>
   u ? u.replace(/^http:\/\//, "https://") : null;
 
 async function getReviews(bookId: string): Promise<ReviewsResponse> {
-  
-  const vercelBase = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "";
-  
-  const base = process.env.NEXT_PUBLIC_BASE_URL || vercelBase || "";
-
   const res = await fetch(
-    `${base}/api/reviews?bookId=${encodeURIComponent(bookId)}`,
-    { cache: "no-store" }
+    `/api/reviews?bookId=${encodeURIComponent(bookId)}`,
+    { cache: "no-store" } 
   );
   if (!res.ok) return { items: [] };
   const data = (await res.json()) as ReviewsResponse;
@@ -48,9 +46,9 @@ async function getReviews(bookId: string): Promise<ReviewsResponse> {
 export default async function BookPage({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params: { id: string }; 
 }) {
-  const { id } = await params;
+  const { id } = params; 
   const libro: Libro = await libroPorId(id);
   const { items: reviews } = await getReviews(id);
 
