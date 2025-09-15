@@ -1,4 +1,3 @@
-
 import Image from "next/image";
 import Link from "next/link";
 import { libroPorId } from "@/lib/google";
@@ -7,6 +6,7 @@ import { VoteBar } from "./VoteBar";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic"; 
+
 type Libro = {
   id: string;
   titulo: string | null;
@@ -18,17 +18,10 @@ type Libro = {
   descripcion: string | null;
 };
 
-export default async function BookPage({
-  params,
-}: {
-  params: { id: string }; 
-}) {
-  const { id } = params;
-
-
+export default async function BookPage({ params }: { params: { id: string } }) {
+  const { id } = params; 
   const libro: Libro = await libroPorId(id);
 
-  
   const reviews = await prisma.review.findMany({
     where: { bookId: id },
     orderBy: [{ upvotes: "desc" }, { createdAt: "desc" }],
@@ -88,7 +81,8 @@ export default async function BookPage({
 
       <section className="card card-pad relative z-10">
         <h2 className="h2 mb-4">Reseñas de la comunidad</h2>
-        <ReviewForm bookId={libro.id} />
+        
+        <ReviewForm bookId={id} />
 
         <ul className="mt-6 grid gap-4">
           {reviews.length === 0 && <li className="muted">Sé el primero en reseñar.</li>}
