@@ -4,9 +4,9 @@ import Link from "next/link";
 import { libroPorId } from "@/lib/google";
 import { ReviewForm } from "./review-form";
 import { VoteBar } from "./VoteBar";
+import { prisma } from "@/lib/prisma";
 
-export const dynamic = "force-dynamic"; // evita cache en prod
-
+export const dynamic = "force-dynamic"; 
 type Libro = {
   id: string;
   titulo: string | null;
@@ -18,39 +18,24 @@ type Libro = {
   descripcion: string | null;
 };
 
-type Review = {
-  id: number;
-  bookId: string;
-  content: string;
-  rating: number;
-  upvotes: number;
-  downvotes: number;
-  createdAt: string;
-};
-
-type ReviewsResponse = { items: Review[] };
-
-const toHttps = (u?: string | null) =>
-  u ? u.replace(/^http:\/\//, "https://") : null;
-
-async function getReviews(bookId: string): Promise<ReviewsResponse> {
-  const res = await fetch(
-    `/api/reviews?bookId=${encodeURIComponent(bookId)}`,
-    { cache: "no-store" } 
-  );
-  if (!res.ok) return { items: [] };
-  const data = (await res.json()) as ReviewsResponse;
-  return { items: data.items ?? [] };
-}
-
 export default async function BookPage({
   params,
 }: {
   params: { id: string }; 
 }) {
-  const { id } = params; 
+  const { id } = params;
+
+
   const libro: Libro = await libroPorId(id);
-  const { items: reviews } = await getReviews(id);
+
+  
+  const reviews = await prisma.review.findMany({
+    where: { bookId: id },
+    orderBy: [{ upvotes: "desc" }, { createdAt: "desc" }],
+  });
+
+  const toHttps = (u?: string | null) =>
+    u ? u.replace(/^http:\/\//, "https://") : null;
 
   return (
     <div className="relative space-y-6">
@@ -107,7 +92,6 @@ export default async function BookPage({
 
         <ul className="mt-6 grid gap-4">
           {reviews.length === 0 && <li className="muted">Sé el primero en reseñar.</li>}
-
           {reviews.map((r) => (
             <li key={r.id} className="rounded-2xl border border-rose-100 p-4 bg-rose-50/40">
               <div className="flex justify-between items-center">
