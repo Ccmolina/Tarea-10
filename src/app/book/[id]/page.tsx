@@ -19,7 +19,7 @@ type Libro = {
 };
 
 export default async function BookPage({ params }: { params: { id: string } }) {
-  const { id } = params;
+  const { id } = params; // <-- usa SIEMPRE este id
   const libro: Libro = await libroPorId(id);
 
   const reviews = await prisma.review.findMany({
@@ -27,8 +27,7 @@ export default async function BookPage({ params }: { params: { id: string } }) {
     orderBy: [{ upvotes: "desc" }, { createdAt: "desc" }],
   });
 
-  const toHttps = (u?: string | null) =>
-    u ? u.replace(/^http:\/\//, "https://") : null;
+  const toHttps = (u?: string | null) => (u ? u.replace(/^http:\/\//, "https://") : null);
 
   return (
     <div className="relative space-y-6">
@@ -36,7 +35,6 @@ export default async function BookPage({ params }: { params: { id: string } }) {
         &larr; Volver
       </Link>
 
-      
       <div className="card card-pad relative z-10">
         <div className="flex flex-col sm:flex-row gap-6">
           {toHttps(libro.portada) ? (
@@ -63,11 +61,7 @@ export default async function BookPage({ params }: { params: { id: string } }) {
             <h1 className="h1">{libro.titulo}</h1>
             <p className="muted mt-1">{libro.autores || "Autor desconocido"}</p>
             <div className="mt-3 flex flex-wrap gap-2">
-              {libro.fechaPublicacion && (
-                <span className="badge">
-                  Publicado: {libro.fechaPublicacion}
-                </span>
-              )}
+              {libro.fechaPublicacion && <span className="badge">Publicado: {libro.fechaPublicacion}</span>}
               {libro.paginas && <span className="badge">{libro.paginas} páginas</span>}
               {libro.categorias && <span className="badge">{libro.categorias}</span>}
             </div>
@@ -82,27 +76,17 @@ export default async function BookPage({ params }: { params: { id: string } }) {
         )}
       </div>
 
-      
       <section className="card card-pad relative z-10">
         <h2 className="h2 mb-4">Reseñas de la comunidad</h2>
-
-        <ReviewForm bookId={id} />
+        <ReviewForm bookId={id} /> {/* <-- crear con el mismo id */}
 
         <ul className="mt-6 grid gap-4">
-          {reviews.length === 0 && (
-            <li className="muted">Sé el primero en reseñar.</li>
-          )}
-
+          {reviews.length === 0 && <li className="muted">Sé el primero en reseñar.</li>}
           {reviews.map((r) => (
-            <li
-              key={r.id}
-              className="rounded-2xl border border-rose-100 p-4 bg-rose-50/40"
-            >
+            <li key={r.id} className="rounded-2xl border border-rose-100 p-4 bg-rose-50/40">
               <div className="flex justify-between items-center">
                 <span className="text-rose-700 font-semibold">⭐ {r.rating}/5</span>
-                <span className="text-xs text-slate-500">
-                  {new Date(r.createdAt).toLocaleString()}
-                </span>
+                <span className="text-xs text-slate-500">{new Date(r.createdAt).toLocaleString()}</span>
               </div>
               <p className="mt-2 text-slate-800">{r.content}</p>
               <VoteBar id={r.id} up={r.upvotes} down={r.downvotes} />

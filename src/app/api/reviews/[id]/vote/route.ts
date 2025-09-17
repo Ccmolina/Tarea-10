@@ -25,7 +25,7 @@ export async function POST(req: Request, { params }: VoteContext) {
     const review = await prisma.review.update({ where: { id: idNum }, data });
     return NextResponse.json({ item: review }, { status: 200 });
   } catch (err) {
-    console.error("POST /api/reviews/[id]/vote error:", err);
+    console.error("[REVIEWS/VOTE] error", err);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }
