@@ -4,9 +4,11 @@ import { libroPorId } from "@/lib/google";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(_req: Request, { params }: any) {
+type BooksContext = { params: { id: string } };
+
+export async function GET(_req: Request, { params }: BooksContext) {
   try {
-    const { id } = params;            
+    const { id } = params;
     const book = await libroPorId(id);
     if (!book) return NextResponse.json({ error: "Not found" }, { status: 404 });
     return NextResponse.json(book, { status: 200 });

@@ -4,17 +4,24 @@ import { prisma } from "@/lib/prisma";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function POST(req: Request, { params }: any) {
+type VoteBody = { type?: "up" | "down" };
+type VoteContext = { params: { id: string } };
+
+export async function POST(req: Request, { params }: VoteContext) {
   try {
-    const idNum = Number(params.id);   
+    const idNum = Number(params.id);
     if (!Number.isFinite(idNum)) {
       return NextResponse.json({ error: "ID inválido" }, { status: 400 });
     }
-    const { type } = await req.json();
+
+    const { type } = (await req.json().catch(() => ({}))) as VoteBody;
     if (type !== "up" && type !== "down") {
       return NextResponse.json({ error: "type debe ser 'up'|'down'" }, { status: 400 });
     }
-    const data = type === "up" ? { upvotes: { increment: 1 } } : { downvotes: { increment: 1 } };
+
+    const data =
+      type === "up" ? { upvotes: { increment: 1 } } : { downvotes: { increment: 1 } };
+
     const review = await prisma.review.update({ where: { id: idNum }, data });
     return NextResponse.json({ item: review }, { status: 200 });
   } catch (err) {
