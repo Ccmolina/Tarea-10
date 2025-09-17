@@ -1,0 +1,43 @@
+name: Publish Docker image (GHCR)
+
+on:
+  push:
+    branches: [ main, master ]
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write  # necesario para subir a GHCR
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node (para leer versión)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Leer versión desde package.json
+        id: pkg
+        run: |
+          echo "VERSION=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+
+      - name: Login a GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Build de la imagen
+        run: |
+          IMAGE="ghcr.io/${{ github.repository }}/app"
+          GIT_SHA="${{ github.sha }}"
+          VERSION="${{ steps.pkg.outputs.VERSION }}"
+          docker build -t "$IMAGE:latest" -t "$IMAGE:$VERSION" -t "$IMAGE:$GIT_SHA" .
+
+      - name: Push de la imagen
+        run: |
+          IMAGE="ghcr.io/${{ github.repository }}/app"
+          docker push "$IMAGE:latest"
+          docker push "$IMAGE:${{ steps.pkg.outputs.VERSION }}"
+          docker push "$IMAGE:${{ github.sha }}"
