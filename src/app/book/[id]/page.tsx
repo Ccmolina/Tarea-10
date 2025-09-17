@@ -7,6 +7,16 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
+type ReviewModel = {
+  id: number;
+  bookId: string;
+  content: string;
+  rating: number;
+  upvotes: number;
+  downvotes: number;
+  createdAt: Date;
+};
+
 type Libro = {
   id: string;
   titulo: string | null;
@@ -18,11 +28,13 @@ type Libro = {
   descripcion: string | null;
 };
 
-export default async function BookPage({ params }: { params: { id: string } }) {
-  const { id } = params; // <-- usa SIEMPRE este id
+type PageCtx = { params: Promise<{ id: string }> };
+
+export default async function BookPage({ params }: PageCtx) {
+  const { id } = await params; 
   const libro: Libro = await libroPorId(id);
 
-  const reviews = await prisma.review.findMany({
+  const reviews: ReviewModel[] = await prisma.review.findMany({
     where: { bookId: id },
     orderBy: [{ upvotes: "desc" }, { createdAt: "desc" }],
   });
@@ -35,6 +47,7 @@ export default async function BookPage({ params }: { params: { id: string } }) {
         &larr; Volver
       </Link>
 
+     
       <div className="card card-pad relative z-10">
         <div className="flex flex-col sm:flex-row gap-6">
           {toHttps(libro.portada) ? (
@@ -76,13 +89,14 @@ export default async function BookPage({ params }: { params: { id: string } }) {
         )}
       </div>
 
+      {/* Reseñas */}
       <section className="card card-pad relative z-10">
         <h2 className="h2 mb-4">Reseñas de la comunidad</h2>
-        <ReviewForm bookId={id} /> {/* <-- crear con el mismo id */}
+        <ReviewForm bookId={id} />
 
         <ul className="mt-6 grid gap-4">
           {reviews.length === 0 && <li className="muted">Sé el primero en reseñar.</li>}
-          {reviews.map((r) => (
+          {reviews.map((r: ReviewModel) => (
             <li key={r.id} className="rounded-2xl border border-rose-100 p-4 bg-rose-50/40">
               <div className="flex justify-between items-center">
                 <span className="text-rose-700 font-semibold">⭐ {r.rating}/5</span>
