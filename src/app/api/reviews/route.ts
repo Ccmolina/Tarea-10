@@ -1,88 +1,62 @@
 import { NextResponse } from "next/server";
-import connectMongo from "@/lib/mongodb";   
+import { dbConnect } from "@/lib/mongodb";
 import { Review } from "@/models/Review";
+import { getTokenFromCookie } from "@/lib/auth-cookie";
+import { verifyJWT } from "@/lib/jwt";
+import { z } from "zod";
 
-export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-type ReviewBody = {
-  bookId?: string;
-  rating?: number | string;
-  content?: string;
-};
-
+const ReviewSchema = z.object({
+  bookId: z.string().min(1),
+  rating: z.number().int().min(1).max(5),
+  content: z.string().min(3).max(2000),
+});
 
 export async function GET(req: Request) {
   try {
-    await connectMongo();
-
+    await dbConnect();
     const { searchParams } = new URL(req.url);
     const bookId = (searchParams.get("bookId") || "").trim();
 
-    if (!bookId) {
-      return NextResponse.json({ items: [] }, { status: 200 });
-    }
+    if (!bookId) return NextResponse.json({ items: [] }, { status: 200 });
 
     const items = await Review.find({ bookId })
       .sort({ upvotes: -1, createdAt: -1 })
       .lean();
 
     return NextResponse.json({ items }, { status: 200 });
-  } catch (err: unknown) {
+  } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error("❌ GET /api/reviews error:", msg);
-    return NextResponse.json(
-      { error: "Internal error", details: msg },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal error", details: msg }, { status: 500 });
   }
 }
 
-
 export async function POST(req: Request) {
   try {
-    await connectMongo();
+    await dbConnect();
+    const token = await getTokenFromCookie();
+    if (!token) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
-    const raw = (await req.json().catch(() => null)) as ReviewBody | null;
-    if (!raw) {
-      return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
-    }
+    const { sub } = await verifyJWT(token);
+    if (!sub) return NextResponse.json({ error: "Token inválido" }, { status: 401 });
 
-    const bookId = (raw.bookId || "").trim();
-    const content = (raw.content || "").trim();
-    const ratingNum =
-      typeof raw.rating === "string" ? Number(raw.rating) : raw.rating;
+    const input = ReviewSchema.parse(await req.json());
 
-  
-    if (!bookId || !content) {
-      return NextResponse.json({ error: "Faltan campos" }, { status: 400 });
-    }
-
-    if (
-      !Number.isFinite(ratingNum) ||
-      (ratingNum as number) < 1 ||
-      (ratingNum as number) > 5
-    ) {
-      return NextResponse.json({ error: "El rating debe ser entre 1 y 5" }, { status: 400 });
-    }
-
-   
     const review = await Review.create({
-      bookId,
-      content,
-      rating: Math.trunc(ratingNum as number),
+      userId: sub,
+      bookId: input.bookId,
+      content: input.content,
+      rating: input.rating,
       upvotes: 0,
       downvotes: 0,
       createdAt: new Date(),
     });
 
     return NextResponse.json(review, { status: 201 });
-  } catch (err: unknown) {
+  } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error("❌ POST /api/reviews error:", msg);
-    return NextResponse.json(
-      { error: "Internal error", details: msg },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal error", details: msg }, { status: 500 });
   }
 }

@@ -1,25 +1,21 @@
+
 import mongoose from "mongoose";
 
-const uri = process.env.MONGODB_URI as string;
-if (!uri) {
-  throw new Error("❌ Faltó configurar MONGODB_URI en el archivo .env");
+function getMongoUri(): string {
+  const v = process.env.MONGODB_URI;
+  if (!v) throw new Error("⚠️ MONGODB_URI no está configurado");
+  return v;
 }
+const MONGO_URI = getMongoUri();
 
-let cached = (global as any).mongoose;
+type Cached = { conn: typeof mongoose | null; promise: Promise<typeof mongoose> | null };
+declare global { var _mongoose: Cached | undefined; }
+const cached: Cached = globalThis._mongoose ?? { conn: null, promise: null };
+globalThis._mongoose = cached;
 
-if (!cached) {
-  cached = (global as any).mongoose = { conn: null, promise: null };
-}
-
-export default async function connectMongo() {
+export async function dbConnect() {
   if (cached.conn) return cached.conn;
-
-  if (!cached.promise) {
-    cached.promise = mongoose
-      .connect(uri, { bufferCommands: false })
-      .then((m) => m);
-  }
-
+  if (!cached.promise) cached.promise = mongoose.connect(MONGO_URI, { dbName: "books" });
   cached.conn = await cached.promise;
   return cached.conn;
 }
