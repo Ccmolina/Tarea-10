@@ -1,141 +1,173 @@
+
 import Image from "next/image";
 import Link from "next/link";
-import { libroPorId } from "@/lib/google";
-import { ReviewForm } from "./review-form";
-import { VoteBar } from "./VoteBar";
 
-export const dynamic = "force-dynamic";
-
-type ReviewModel = {
-  id: number;            
-  bookId: string;
-  content: string;
-  rating: number;
-  upvotes: number;
-  downvotes: number;
-  createdAt: Date | string;
+type PageProps = {
+  params: { id: string };
+  searchParams?: Record<string, string | string[] | undefined>;
 };
 
-type ReviewMongo = {
-  _id: string;
-  bookId: string;
-  content: string;
-  rating: number;
-  upvotes?: number;
-  downvotes?: number;
-  createdAt: string;
-};
-
-type Libro = {
-  id: string;
-  titulo: string | null;
-  autores: string | null;
-  portada: string | null;
-  paginas: number | null;
-  categorias: string | null;
-  fechaPublicacion: string | null;
-  descripcion: string | null;
-};
-
-type PageCtx = { params: Promise<{ id: string }> };
-
-export default async function BookPage({ params }: PageCtx) {
-  const { id } = await params;
-  const libro: Libro = await libroPorId(id);
-
- 
-  const vercelBase = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "";
-  const base = process.env.NEXT_PUBLIC_BASE_URL || vercelBase || "http://localhost:3000";
-
-  const res = await fetch(
-    `${base}/api/reviews?bookId=${encodeURIComponent(id)}`,
-    { cache: "no-store" }
-  );
-
-  
-  const data = (await res.json().catch(() => ({ items: [] as ReviewMongo[] }))) as {
-    items: ReviewMongo[];
+type VolumeInfo = {
+  title?: string;
+  authors?: string[];
+  description?: string;
+  imageLinks?: {
+    smallThumbnail?: string;
+    thumbnail?: string;
   };
+  publisher?: string;
+  publishedDate?: string;
+  pageCount?: number;
+  categories?: string[];
+  averageRating?: number;
+  ratingsCount?: number;
+  language?: string;
+};
 
-  const reviews: ReviewModel[] = (data.items ?? []).map((r: ReviewMongo) => ({
-    id: Number(r._id), // temporal: mantenemos number para no romper VoteBar
-    bookId: r.bookId,
-    content: r.content,
-    rating: r.rating,
-    upvotes: r.upvotes ?? 0,
-    downvotes: r.downvotes ?? 0,
-    createdAt: r.createdAt,
-  }));
+type Volume = {
+  id: string;
+  volumeInfo: VolumeInfo;
+};
 
-  const toHttps = (u?: string | null) => (u ? u.replace(/^http:\/\//, "https://") : null);
+async function fetchBook(id: string): Promise<Volume> {
+  const res = await fetch(`https://www.googleapis.com/books/v1/volumes/${id}`, {
+    
+    next: { revalidate: 3600 },
+  });
+
+  if (res.status === 404) {
+    
+    throw new Error("Libro no encontrado");
+  }
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Error al obtener el libro (${res.status}): ${text}`);
+  }
+
+  const data = (await res.json()) as Volume;
+  if (!data?.id || !data?.volumeInfo) {
+    throw new Error("Respuesta inválida de Google Books");
+  }
+  return data;
+}
+
+function normalizeDescription(html?: string): string {
+  
+  return html ?? "";
+}
+
+function formatAuthors(authors?: string[]): string | null {
+  if (!authors || authors.length === 0) return null;
+  return authors.join(", ");
+}
+
+export const dynamic = "force-static"; // o "auto"; está bien para esta página
+export const revalidate = 3600; // 1 hora
+
+export default async function BookPage({ params }: PageProps) {
+  const { id } = params;
+  const book = await fetchBook(id);
+  const v = book.volumeInfo;
+
+  const title = v.title ?? "Sin título";
+  const authors = formatAuthors(v.authors);
+  const cover =
+    v.imageLinks?.thumbnail ||
+    v.imageLinks?.smallThumbnail ||
+    undefined;
+
+  const description = normalizeDescription(v.description);
 
   return (
-    <div className="relative space-y-6">
-      <Link href="/" className="text-rose-700 hover:underline">
-        &larr; Volver
-      </Link>
+    <main className="mx-auto max-w-5xl px-4 py-8">
+      <nav className="mb-6 text-sm">
+        <Link href="/" className="underline hover:no-underline">
+          ← Volver al inicio
+        </Link>
+      </nav>
 
-      <div className="card card-pad relative z-10">
-        <div className="flex flex-col sm:flex-row gap-6">
-          {toHttps(libro.portada) ? (
+      <section className="grid grid-cols-1 gap-8 md:grid-cols-[200px_1fr]">
+        <div className="flex items-start justify-center">
+          {cover ? (
             <Image
-              src={toHttps(libro.portada)!}
-              alt={libro.titulo || "Libro"}
-              width={160}
-              height={240}
-              className="w-40 h-60 object-cover rounded-2xl border border-rose-100"
+              src={cover.replace("http://", "https://")}
+              alt={title}
+              width={200}
+              height={300}
+              className="rounded-xl shadow"
               priority
             />
           ) : (
-            <Image
-              src="https://via.placeholder.com/160x240?text=No+Img"
-              alt={libro.titulo || "Libro"}
-              width={160}
-              height={240}
-              className="w-40 h-60 object-cover rounded-2xl border border-rose-100"
-              priority
-            />
-          )}
-
-          <div className="flex-1 min-w-0">
-            <h1 className="h1">{libro.titulo}</h1>
-            <p className="muted mt-1">{libro.autores || "Autor desconocido"}</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {libro.fechaPublicacion && <span className="badge">Publicado: {libro.fechaPublicacion}</span>}
-              {libro.paginas && <span className="badge">{libro.paginas} páginas</span>}
-              {libro.categorias && <span className="badge">{libro.categorias}</span>}
+            <div className="flex h-[300px] w-[200px] items-center justify-center rounded-xl bg-gray-100 text-gray-500">
+              Sin portada
             </div>
-          </div>
+          )}
         </div>
 
-        {libro.descripcion && (
-          <section className="mt-6">
-            <h2 className="h2 mb-2">Descripción</h2>
-            <p className="text-slate-800 leading-relaxed">{libro.descripcion}</p>
-          </section>
-        )}
-      </div>
+        <div>
+          <h1 className="mb-2 text-2xl font-semibold">{title}</h1>
+          {authors && <p className="mb-3 text-gray-700">Autor(es): {authors}</p>}
 
-      <section className="card card-pad relative z-10">
-        <h2 className="h2 mb-4">Reseñas de la comunidad</h2>
-        <ReviewForm bookId={id} />
-
-        <ul className="mt-6 grid gap-4">
-          {reviews.length === 0 && <li className="muted">Sé el primero en reseñar.</li>}
-          {reviews.map((r: ReviewModel) => (
-            <li key={String(r.id)} className="rounded-2xl border border-rose-100 p-4 bg-rose-50/40">
-              <div className="flex justify-between items-center">
-                <span className="text-rose-700 font-semibold">⭐ {r.rating}/5</span>
-                <span className="text-xs text-slate-500">
-                  {new Date(r.createdAt).toLocaleString()}
-                </span>
+          <div className="mb-4 grid grid-cols-2 gap-2 text-sm text-gray-600 sm:grid-cols-3">
+            {v.publisher && (
+              <div>
+                <span className="font-medium">Editorial:</span> {v.publisher}
               </div>
-              <p className="mt-2 text-slate-800">{r.content}</p>
-              <VoteBar id={r.id as unknown as number} up={r.upvotes} down={r.downvotes} />
-            </li>
-          ))}
-        </ul>
+            )}
+            {v.publishedDate && (
+              <div>
+                <span className="font-medium">Fecha:</span> {v.publishedDate}
+              </div>
+            )}
+            {typeof v.pageCount === "number" && (
+              <div>
+                <span className="font-medium">Páginas:</span> {v.pageCount}
+              </div>
+            )}
+            {v.categories?.length ? (
+              <div className="col-span-2 sm:col-span-1">
+                <span className="font-medium">Categorías:</span>{" "}
+                {v.categories.join(", ")}
+              </div>
+            ) : null}
+            {typeof v.averageRating === "number" && (
+              <div>
+                <span className="font-medium">Rating:</span> {v.averageRating} ⭐
+                {typeof v.ratingsCount === "number" ? ` (${v.ratingsCount})` : ""}
+              </div>
+            )}
+            {v.language && (
+              <div>
+                <span className="font-medium">Idioma:</span> {v.language.toUpperCase()}
+              </div>
+            )}
+          </div>
+
+          <article
+            className="prose max-w-none prose-p:leading-relaxed prose-headings:mt-6 prose-headings:mb-3"
+            dangerouslySetInnerHTML={{ __html: description }}
+          />
+
+          
+          <div className="mt-8 flex gap-3">
+            <Link
+              href={`/reviews/new?bookId=${encodeURIComponent(book.id)}`}
+              className="rounded-xl bg-black px-4 py-2 text-white hover:opacity-90"
+            >
+              Escribir reseña
+            </Link>
+            <form action={`/api/favorites`} method="post">
+              <input type="hidden" name="bookId" value={book.id} />
+              <button
+                className="rounded-xl border px-4 py-2 hover:bg-gray-50"
+                type="submit"
+              >
+                Agregar a Favoritos
+              </button>
+            </form>
+          </div>
+        </div>
       </section>
-    </div>
+    </main>
   );
 }
