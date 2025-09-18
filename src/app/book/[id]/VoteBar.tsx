@@ -1,19 +1,16 @@
 "use client";
 
-type Props = { id: string; up: number; down: number }; 
+type Props = { id: string; up: number; down: number };
 
 export function VoteBar({ id, up, down }: Props) {
   const vote = async (type: "up" | "down") => {
     const res = await fetch("/api/votes", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ reviewId: id, type }), 
+      body: JSON.stringify({ reviewId: id, type }),
     });
-    if (res.ok) {
-      window.location.reload(); // o router.refresh() si usas next/navigation
-    } else {
-      alert("No se pudo votar");
-    }
+    if (res.ok) window.location.reload();
+    else alert("No se pudo votar (¿sesión iniciada?)");
   };
 
   return (

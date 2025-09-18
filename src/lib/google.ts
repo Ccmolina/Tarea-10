@@ -13,7 +13,7 @@ type VolumeInfo = {
 type GoogleItem = { id: string; volumeInfo?: VolumeInfo }
 type GoogleSearch = { totalItems?: number; items?: GoogleItem[] }
 
-// Normaliza el libro que devuelve Google
+
 function normalizar(item: GoogleItem) {
   const v = item.volumeInfo ?? {}
   const img = v.imageLinks ?? {}
@@ -29,7 +29,7 @@ function normalizar(item: GoogleItem) {
   }
 }
 
-// Busca libros por título, autor o ISBN
+
 export async function buscarLibros(q: string, startIndex = 0) {
   if (!q) return { items: [], total: 0 }
   const url = `${BASE}?q=${encodeURIComponent(q)}&maxResults=20&startIndex=${startIndex}`
@@ -40,13 +40,13 @@ export async function buscarLibros(q: string, startIndex = 0) {
 }
 
 export async function libroPorId(id: string) {
-  // ¿Es una consulta tipo "isbn:...", "inauthor:...", etc.?
+  
   if (id.includes(':')) {
     const buscado = await buscarLibros(id, 0)
     const primero = buscado.items[0]
     if (primero) return primero
 
-    // Sin resultados: devolver estructura 
+    
     return {
       id,
       titulo: 'Sin título',
@@ -59,7 +59,7 @@ export async function libroPorId(id: string) {
     }
   }
 
-  // volumeId real
+ 
   const res = await fetch(`${BASE}/${id}`, { cache: 'no-store' })
   const data: GoogleItem = await res.json()
   return normalizar(data)

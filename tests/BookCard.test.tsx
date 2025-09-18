@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import BookCard from "../src/component/BookCard";
+import BookCard from "../src/components/BookCard";
 import React from "react";
 
 
