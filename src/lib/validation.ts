@@ -13,13 +13,13 @@ export const LoginSchema = z.object({
 
 export const ReviewSchema = z.object({
   bookId: z.string().min(1),
-  rating: z.number().int().min(1).max(5),
+  rating: z.coerce.number().int().min(1).max(5),  
   content: z.string().min(3).max(2000)
 });
 
 export const VoteSchema = z.object({
   reviewId: z.string().min(1),
-  value: z.enum(["up", "down"])
+  type: z.enum(["up", "down"])                   
 });
 
 export const FavoriteSchema = z.object({

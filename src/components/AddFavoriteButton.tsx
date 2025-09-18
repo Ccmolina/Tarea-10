@@ -1,12 +1,6 @@
 "use client";
 
-export function AddFavoriteButton({
-  bookId,
-  className,
-}: {
-  bookId: string;
-  className?: string;
-}) {
+export function AddFavoriteButton({ bookId, className }: { bookId: string; className?: string }) {
   async function onClick() {
     const res = await fetch("/api/favorites", {
       method: "POST",
