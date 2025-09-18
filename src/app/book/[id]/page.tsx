@@ -1,113 +1,142 @@
+
 import Image from "next/image";
 import Link from "next/link";
-import { libroPorId } from "@/lib/google";
-import { ReviewForm } from "./review-form";
-import { VoteBar } from "./VoteBar";
-import { prisma } from "@/lib/prisma";
+import { dbConnect } from "@/lib/mongodb";
+import { Review } from "@/models/Review";
+import { ReviewForm } from "./review-form";             
+import { VoteBar } from "./VoteBar";                  
+import { AddFavoriteButton } from "@/components/AddFavoriteButton";
 
-export const dynamic = "force-dynamic";
+type PageProps = { params: { id: string } };
 
-type ReviewModel = {
-  id: number;
-  bookId: string;
-  content: string;
-  rating: number;
-  upvotes: number;
-  downvotes: number;
-  createdAt: Date;
+type VolumeInfo = {
+  title?: string;
+  authors?: string[];
+  description?: string;
+  imageLinks?: { thumbnail?: string };
+  categories?: string[];
 };
+type Volume = { id: string; volumeInfo: VolumeInfo };
 
-type Libro = {
-  id: string;
-  titulo: string | null;
-  autores: string | null;
-  portada: string | null;
-  paginas: number | null;
-  categorias: string | null;
-  fechaPublicacion: string | null;
-  descripcion: string | null;
-};
-
-type PageCtx = { params: Promise<{ id: string }> };
-
-export default async function BookPage({ params }: PageCtx) {
-  const { id } = await params; 
-  const libro: Libro = await libroPorId(id);
-
-  const reviews: ReviewModel[] = await prisma.review.findMany({
-    where: { bookId: id },
-    orderBy: [{ upvotes: "desc" }, { createdAt: "desc" }],
+async function fetchBook(id: string): Promise<Volume> {
+  const res = await fetch(`https://www.googleapis.com/books/v1/volumes/${id}`, {
+    next: { revalidate: 3600 },
   });
+  if (!res.ok) throw new Error("No se pudo obtener el libro");
+  return (await res.json()) as Volume;
+}
 
-  const toHttps = (u?: string | null) => (u ? u.replace(/^http:\/\//, "https://") : null);
+export const revalidate = 3600;
+
+export default async function BookPage({ params }: PageProps) {
+  const { id } = params;
+  const book = await fetchBook(id);
+
+  await dbConnect();
+  const reviews = await Review.find({ bookId: id }).sort({ createdAt: -1 }).lean();
+
+  const thumb = book.volumeInfo.imageLinks?.thumbnail
+    ? book.volumeInfo.imageLinks.thumbnail.replace("http://", "https://")
+    : null;
 
   return (
-    <div className="relative space-y-6">
-      <Link href="/" className="text-rose-700 hover:underline">
-        &larr; Volver
-      </Link>
+    <main className="mx-auto max-w-4xl px-4 py-8">
+      <nav className="mb-6">
+        <Link href="/" className="underline">← Volver al inicio</Link>
+      </nav>
 
-     
-      <div className="card card-pad relative z-10">
-        <div className="flex flex-col sm:flex-row gap-6">
-          {toHttps(libro.portada) ? (
+      <div className="card card-pad">
+        <div className="flex gap-5">
+          {thumb ? (
             <Image
-              src={toHttps(libro.portada)!}
-              alt={libro.titulo || "Libro"}
-              width={160}
-              height={240}
-              className="w-40 h-60 object-cover rounded-2xl border border-rose-100"
-              priority
+              src={thumb}
+              alt={book.volumeInfo.title ?? "Portada"}
+              width={120}
+              height={180}
+              className="rounded-xl border border-rose-100"
+              
             />
           ) : (
-            <Image
-              src="https://via.placeholder.com/160x240?text=No+Img"
-              alt={libro.titulo || "Libro"}
-              width={160}
-              height={240}
-              className="w-40 h-60 object-cover rounded-2xl border border-rose-100"
-              priority
-            />
+            <div className="w-[120px] h-[180px] rounded-xl bg-rose-50 border border-rose-100" />
           )}
 
-          <div className="flex-1 min-w-0">
-            <h1 className="h1">{libro.titulo}</h1>
-            <p className="muted mt-1">{libro.autores || "Autor desconocido"}</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {libro.fechaPublicacion && <span className="badge">Publicado: {libro.fechaPublicacion}</span>}
-              {libro.paginas && <span className="badge">{libro.paginas} páginas</span>}
-              {libro.categorias && <span className="badge">{libro.categorias}</span>}
+          <div className="min-w-0 flex-1">
+            <h1 className="text-2xl font-bold text-rose-800">
+              {book.volumeInfo.title ?? "Sin título"}
+            </h1>
+
+            {book.volumeInfo.authors?.length ? (
+              <p className="muted mt-1">{book.volumeInfo.authors.join(", ")}</p>
+            ) : null}
+
+            {book.volumeInfo.categories?.length ? (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {book.volumeInfo.categories.map((c) => (
+                  <span key={c} className="badge">{c}</span>
+                ))}
+              </div>
+            ) : null}
+
+            <div className="mt-3">
+              <AddFavoriteButton bookId={id} className="btn btn-rose" />
             </div>
           </div>
         </div>
 
-        {libro.descripcion && (
-          <section className="mt-6">
-            <h2 className="h2 mb-2">Descripción</h2>
-            <p className="text-slate-800 leading-relaxed">{libro.descripcion}</p>
-          </section>
-        )}
+        <h2 className="mt-6 text-xl font-bold text-rose-800">Descripción</h2>
+        <article
+          className="prose mt-2"
+          dangerouslySetInnerHTML={{
+            __html: book.volumeInfo.description ?? "<p>Sin descripción.</p>",
+          }}
+        />
       </div>
 
-      {/* Reseñas */}
-      <section className="card card-pad relative z-10">
-        <h2 className="h2 mb-4">Reseñas de la comunidad</h2>
-        <ReviewForm bookId={id} />
+      
+      <section className="mt-6">
+        <div className="card">
+          <div className="card-pad">
+            <h2 className="text-2xl font-extrabold text-rose-800">
+              Reseñas de la comunidad
+            </h2>
 
-        <ul className="mt-6 grid gap-4">
-          {reviews.length === 0 && <li className="muted">Sé el primero en reseñar.</li>}
-          {reviews.map((r: ReviewModel) => (
-            <li key={r.id} className="rounded-2xl border border-rose-100 p-4 bg-rose-50/40">
-              <div className="flex justify-between items-center">
-                <span className="text-rose-700 font-semibold">⭐ {r.rating}/5</span>
-                <span className="text-xs text-slate-500">{new Date(r.createdAt).toLocaleString()}</span>
-              </div>
-              <p className="mt-2 text-slate-800">{r.content}</p>
-              <VoteBar id={r.id} up={r.upvotes} down={r.downvotes} />
-            </li>
-          ))}
-        </ul>
+            <div className="mt-4 rounded-2xl border border-rose-100 bg-white/70 p-4">
+              <ReviewForm bookId={id} />
+            </div>
+
+            <div className="mt-6">
+              {reviews.length === 0 ? (
+                <p className="muted">No hay reseñas aún. ¡Sé el primero!</p>
+              ) : (
+                <ul className="space-y-4">
+                  {reviews.map((r: any) => (
+                    <li
+                      key={String(r._id)}
+                      className="rounded-2xl border border-rose-100 bg-white/70 p-4"
+                    >
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <span className="text-rose-700">⭐ {r.rating}/5</span>
+                          <p className="mt-1">{r.content}</p>
+                        </div>
+                        <span className="muted text-xs">
+                          {new Date(r.createdAt).toLocaleString()}
+                        </span>
+                      </div>
+
+                      <VoteBar
+                        id={String(r._id)}
+                        up={r.upvotes ?? 0}
+                        down={r.downvotes ?? 0}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
       </section>
-    </div>
+    </main>
   );
 }

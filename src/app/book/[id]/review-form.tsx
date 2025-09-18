@@ -1,4 +1,5 @@
 "use client";
+
 import { useState, useTransition } from "react";
 
 export function ReviewForm({ bookId }: { bookId: string }) {
@@ -19,6 +20,10 @@ export function ReviewForm({ bookId }: { bookId: string }) {
             body: JSON.stringify({ bookId, rating, content }),
           });
           if (!res.ok) {
+            if (res.status === 401) {
+              setError("Necesitás iniciar sesión para publicar una reseña.");
+              return;
+            }
             const j = await res.json().catch(() => ({}));
             setError(j.error || "Error guardando la reseña");
             return;
@@ -27,7 +32,6 @@ export function ReviewForm({ bookId }: { bookId: string }) {
           window.location.reload();
         });
       }}
-      className="rounded-2xl border border-rose-100 bg-white/70 p-4"
     >
       <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
         <label className="text-sm font-medium text-rose-800">Calificación</label>
@@ -36,7 +40,11 @@ export function ReviewForm({ bookId }: { bookId: string }) {
           onChange={(e) => setRating(Number(e.target.value))}
           className="input sm:max-w-[140px]"
         >
-          {[1,2,3,4,5].map(n => <option key={n} value={n}>{n}</option>)}
+          {[1, 2, 3, 4, 5].map((n) => (
+            <option key={n} value={n}>
+              {n}
+            </option>
+          ))}
         </select>
       </div>
 
@@ -51,7 +59,7 @@ export function ReviewForm({ bookId }: { bookId: string }) {
       {error && <p className="mt-2 text-rose-700">{error}</p>}
 
       <div className="mt-3 flex gap-2">
-        <button className="btn btn-rose" disabled={pending || content.trim().length===0}>
+        <button className="btn btn-rose" disabled={pending || content.trim().length === 0}>
           {pending ? "Publicando…" : "Publicar reseña"}
         </button>
         <button
@@ -65,4 +73,3 @@ export function ReviewForm({ bookId }: { bookId: string }) {
     </form>
   );
 }
-

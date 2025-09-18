@@ -1,31 +1,56 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { dbConnect } from "@/lib/mongodb";
+import { Review } from "@/models/Review";
+import { getTokenFromCookie } from "@/lib/auth-cookie";
+import { verifyJWT } from "@/lib/jwt";
+import { z } from "zod";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type VoteBody = { type?: "up" | "down" };
-type VoteCtx = { params: Promise<{ id: string }> };
+const PatchSchema = z.object({
+  rating: z.number().int().min(1).max(5).optional(),
+  content: z.string().min(3).max(2000).optional(),
+});
 
-export async function POST(req: Request, ctx: VoteCtx) {
-  const { id } = await ctx.params;          
-  const idNum = Number(id);
-  if (!Number.isFinite(idNum)) {
-    return NextResponse.json({ error: "ID inválido" }, { status: 400 });
+type Ctx = { params: { id: string } };
+
+export async function PATCH(req: Request, { params }: Ctx) {
+  await dbConnect();
+  const token = await getTokenFromCookie();
+  if (!token) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+
+  const { sub } = await verifyJWT(token);
+  if (!sub) return NextResponse.json({ error: "Token inválido" }, { status: 401 });
+
+  const input = PatchSchema.parse(await req.json());
+  const review = await Review.findById(params.id);
+  if (!review) return NextResponse.json({ error: "No encontrada" }, { status: 404 });
+
+  if (String(review.userId) !== String(sub)) {
+    return NextResponse.json({ error: "Prohibido" }, { status: 403 });
   }
 
-  const { type } = (await req.json().catch(() => ({}))) as VoteBody;
-  if (type !== "up" && type !== "down") {
-    return NextResponse.json({ error: "type debe ser 'up'|'down'" }, { status: 400 });
+  Object.assign(review, input);
+  await review.save();
+  return NextResponse.json(review, { status: 200 });
+}
+
+export async function DELETE(_req: Request, { params }: Ctx) {
+  await dbConnect();
+  const token = await getTokenFromCookie();
+  if (!token) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+
+  const { sub } = await verifyJWT(token);
+  if (!sub) return NextResponse.json({ error: "Token inválido" }, { status: 401 });
+
+  const review = await Review.findById(params.id);
+  if (!review) return NextResponse.json({ error: "No encontrada" }, { status: 404 });
+
+  if (String(review.userId) !== String(sub)) {
+    return NextResponse.json({ error: "Prohibido" }, { status: 403 });
   }
 
-  try {
-    const data =
-      type === "up" ? { upvotes: { increment: 1 } } : { downvotes: { increment: 1 } };
-    const review = await prisma.review.update({ where: { id: idNum }, data });
-    return NextResponse.json({ item: review }, { status: 200 });
-  } catch {
-  
-    return NextResponse.json({ error: "Internal error" }, { status: 500 });
-  }
+  await review.deleteOne();
+  return NextResponse.json({ ok: true }, { status: 200 });
 }

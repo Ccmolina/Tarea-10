@@ -1,51 +1,62 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { dbConnect } from "@/lib/mongodb";
+import { Review } from "@/models/Review";
+import { getTokenFromCookie } from "@/lib/auth-cookie";
+import { verifyJWT } from "@/lib/jwt";
+import { z } from "zod";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const ReviewSchema = z.object({
+  bookId: z.string().min(1),
+  rating: z.number().int().min(1).max(5),
+  content: z.string().min(3).max(2000),
+});
 
 export async function GET(req: Request) {
   try {
+    await dbConnect();
     const { searchParams } = new URL(req.url);
     const bookId = (searchParams.get("bookId") || "").trim();
+
     if (!bookId) return NextResponse.json({ items: [] }, { status: 200 });
 
-    const items = await prisma.review.findMany({
-      where: { bookId },
-      orderBy: [{ upvotes: "desc" }, { createdAt: "desc" }],
-    });
+    const items = await Review.find({ bookId })
+      .sort({ upvotes: -1, createdAt: -1 })
+      .lean();
 
     return NextResponse.json({ items }, { status: 200 });
   } catch (err) {
-    console.error("[REVIEWS/GET] error", err);
-    return NextResponse.json({ error: "Internal error" }, { status: 500 });
+    const msg = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: "Internal error", details: msg }, { status: 500 });
   }
 }
 
-
 export async function POST(req: Request) {
   try {
-    const { bookId, rating, content } = await req.json();
+    await dbConnect();
+    const token = await getTokenFromCookie();
+    if (!token) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
-    console.log("[REVIEWS/POST] incoming", { bookId, rating, len: content?.length });
+    const { sub } = await verifyJWT(token);
+    if (!sub) return NextResponse.json({ error: "Token inválido" }, { status: 401 });
 
-    if (!bookId || !content?.trim())
-      return NextResponse.json({ error: "Faltan campos" }, { status: 400 });
+    const input = ReviewSchema.parse(await req.json());
 
-    const ratingNum = Number(rating);
-    if (!Number.isFinite(ratingNum) || ratingNum < 1 || ratingNum > 5)
-      return NextResponse.json({ error: "rating 1-5" }, { status: 400 });
-
-    const review = await prisma.review.create({
-      data: { bookId, content: content.trim(), rating: Math.trunc(ratingNum) },
+    const review = await Review.create({
+      userId: sub,
+      bookId: input.bookId,
+      content: input.content,
+      rating: input.rating,
+      upvotes: 0,
+      downvotes: 0,
+      createdAt: new Date(),
     });
-
-    console.log("[REVIEWS/POST] created", { id: review.id, bookId: review.bookId });
 
     return NextResponse.json(review, { status: 201 });
   } catch (err) {
-    console.error("[REVIEWS/POST] error", err);
-    return NextResponse.json({ error: "Internal error" }, { status: 500 });
+    const msg = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: "Internal error", details: msg }, { status: 500 });
   }
 }
